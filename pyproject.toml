@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rewardlab"
+version = "0.1.0"
+description = "Reward shaping wrappers and a reward-hacking detector for Gymnasium / Stable-Baselines3"
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium[box2d]>=1.0",
+    "stable-baselines3>=2.3",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "pyyaml",
+    "imageio",
+]
+
+[project.optional-dependencies]
+demo = ["gradio"]
+dev = ["pytest", "ruff", "tensorboard", "moviepy"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts", "app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

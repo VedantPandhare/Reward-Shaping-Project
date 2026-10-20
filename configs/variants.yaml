@@ -1,0 +1,28 @@
+# Each variant: `fn` selects the reward function in rewardlab.wrappers, `params` are its kwargs.
+# `total_timesteps` (optional) overrides base.yaml.
+baseline:
+  fn: none
+time_penalty:
+  fn: time_penalty
+  params: {penalty: 0.05}
+hover_hack:
+  fn: hover_hack
+  params: {bonus: 1.0, max_abs_angle: 0.2, max_speed: 0.3}
+delta_fix:
+  fn: delta_fix
+  params: {scale: 10.0, time_penalty: 0.05}
+delta_no_time:
+  fn: delta_fix
+  params: {scale: 10.0, time_penalty: 0.0}
+tilt_only_hack:
+  fn: tilt_only_hack
+  params: {bonus: 1.0, max_abs_angle: 0.2}
+  total_timesteps: 500000
+fuel_efficient:
+  fn: fuel_efficient
+  params: {multiplier: 2.0}
+  total_timesteps: 500000
+soft_landing:
+  fn: soft_landing
+  params: {scale: 10.0}
+  total_timesteps: 500000
