@@ -11,21 +11,21 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-from rewardlab.envs import load_variants  # noqa: E402
+from rewardlab.envs import load_variants
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNS = ROOT / "runs"
 RESULTS = ROOT / "results"
 METRICS = ["mean_return", "landing_rate", "crash_rate", "timeout_rate", "mean_length", "mean_fuel",
-           "custom_share", "steps_to_200"]
+           "custom_share", "steps_to_150"]
 
 
-def steps_to_200(episodes: pd.DataFrame, window: int = 100, target: float = 200.0):
-    """First training timestep where the rolling mean raw return (stochastic policy) >= target."""
+def steps_to_150(episodes: pd.DataFrame, window: int = 100, target: float = 150.0):
+    """First training timestep where the rolling mean raw return (stochastic policy) >= target (training return is stochastic, hence 150 not 200)."""
     if len(episodes) < window:
         return np.nan
     roll = episodes["raw_return"].rolling(window).mean()
@@ -48,7 +48,7 @@ def collect(algo_suffix: str = "") -> pd.DataFrame:
                 continue
             row = {"variant": variant, "seed": int(sdir.name[4:]), **json.loads(f.read_text())}
             ep = sdir / "episodes.csv"
-            row["steps_to_200"] = steps_to_200(pd.read_csv(ep)) if ep.exists() else np.nan
+            row["steps_to_150"] = steps_to_150(pd.read_csv(ep)) if ep.exists() else np.nan
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -62,7 +62,7 @@ def ablation(df: pd.DataFrame) -> pd.DataFrame:
         for m in METRICS:
             row[f"{m}_mean"], row[f"{m}_std"] = d[m].mean(), d[m].std(ddof=0)
         row["hack_flag"] = f"{int(d['hack_flag'].sum())}/{len(d)}"
-        row["reached_200"] = f"{int(d['steps_to_200'].notna().sum())}/{len(d)}"
+        row["reached_150"] = f"{int(d['steps_to_150'].notna().sum())}/{len(d)}"
         out.append(row)
     return pd.DataFrame(out)
 
@@ -71,12 +71,12 @@ def to_markdown(ab: pd.DataFrame) -> str:
     def pm(r, m, fmt):
         return f"{r[m + '_mean']:{fmt}} ± {r[m + '_std']:{fmt}}"
 
-    lines = ["| Variant | Seeds | Return | Landing | Crash | Timeout | Ep. length | Fuel | "
-             "Steps to 200 | Hack flag |",
+    lines = [("| Variant | Seeds | Return | Landing | Crash | Timeout | Ep. length | Fuel | "
+             "Steps to 150 (train) | Hack flag |"),
              "|---|---|---|---|---|---|---|---|---|---|"]
     for _, r in ab.iterrows():
-        s200 = (f"{r['steps_to_200_mean'] / 1e3:.0f}k ± {r['steps_to_200_std'] / 1e3:.0f}k "
-                f"({r['reached_200']})" if r["reached_200"][0] != "0" else f"never ({r['reached_200']})")
+        s200 = (f"{r['steps_to_150_mean'] / 1e3:.0f}k ± {r['steps_to_150_std'] / 1e3:.0f}k "
+                f"({r['reached_150']})" if r["reached_150"][0] != "0" else f"never ({r['reached_150']})")
         lines.append(f"| {r['variant']} | {r['n_seeds']} | {pm(r, 'mean_return', '.0f')} | "
                      f"{pm(r, 'landing_rate', '.2f')} | {pm(r, 'crash_rate', '.2f')} | "
                      f"{pm(r, 'timeout_rate', '.2f')} | {pm(r, 'mean_length', '.0f')} | "
@@ -150,7 +150,7 @@ def main():
     df.to_csv(RESULTS / "per_seed.csv", index=False)
     ab = ablation(df)
     ab.to_csv(RESULTS / "ablation.csv", index=False)
-    (RESULTS / "ablation.md").write_text(to_markdown(ab) + "\n")
+    (RESULTS / "ablation.md").write_text(to_markdown(ab) + "\n", encoding="utf-8")
     print(to_markdown(ab))
     present = set(df["variant"])
     for v in present:

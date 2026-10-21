@@ -28,7 +28,7 @@ def rollout_with_frames(model, variant: str, seed: int, max_steps: int = 1000, g
         raw = info["raw_reward"]
         terms = env_breakdown(obs, nobs, action, raw)
         custom = {k: v for k, v in info["reward_terms"].items() if k != "env"}
-        steps.append({"t": t, "action": action, **terms, **custom, "raw_reward": raw,
+        steps.append({"t": t, "action": action, **{k: float(v) for k, v in terms.items()}, **custom, "raw_reward": raw,
                       "total_reward": float(r)})
         fuel += 0.3 if action == 2 else 0.03 if action in (1, 3) else 0.0
         ret += raw

@@ -17,10 +17,10 @@ from rewardlab.evaluate import evaluate_run
 
 RUNS_DIR = Path(__file__).resolve().parents[2] / "runs"
 
-DQN_KWARGS = dict(learning_rate=6.3e-4, batch_size=128, buffer_size=50000, learning_starts=0,
-                  gamma=0.99, target_update_interval=250, train_freq=4, gradient_steps=-1,
-                  exploration_fraction=0.12, exploration_final_eps=0.1,
-                  policy_kwargs=dict(net_arch=[256, 256]))
+DQN_KWARGS = {"learning_rate": 6.3e-4, "batch_size": 128, "buffer_size": 50000, "learning_starts": 0,
+                  "gamma": 0.99, "target_update_interval": 250, "train_freq": 4, "gradient_steps": -1,
+                  "exploration_fraction": 0.12, "exploration_final_eps": 0.1,
+                  "policy_kwargs": {"net_arch": [256, 256]}}
 
 
 def run_dir_for(variant: str, seed: int, algo: str = "ppo") -> Path:

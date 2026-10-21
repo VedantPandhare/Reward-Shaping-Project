@@ -47,7 +47,7 @@ print(f"{len(jobs)} runs, {args.workers} workers")
 
 def run(job):
     v, s, cmd = job
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, check=False)
     return v, s, r.returncode, r.stderr[-500:] if r.returncode else ""
 
 

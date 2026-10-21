@@ -3,7 +3,12 @@ import numpy as np
 import pytest
 
 from rewardlab.wrappers import (
-    DeltaFix, HoverHack, RewardShapingWrapper, TimePenalty, env_breakdown, make_reward_fn,
+    DeltaFix,
+    HoverHack,
+    RewardShapingWrapper,
+    TimePenalty,
+    env_breakdown,
+    make_reward_fn,
 )
 
 
