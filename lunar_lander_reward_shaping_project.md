@@ -3,7 +3,7 @@
 > **Audience:** a coding agent (and the human supervising it) that will build this project end to end.
 > **Nature of project:** a portfolio / engineering project. Not a research paper. Rigor is used to avoid fooling ourselves, not to publish.
 > **Cost:** free. Everything uses open-source tools and runs on a laptop CPU. Deployment uses a free tier.
-> **Origin:** based on a project write-up by Hari (@harixganesh), extended with a multi-seed evaluation, ablations, a reward-hacking detector, a reusable library and a deployed demo.
+> **Origin:** An extended with a multi-seed evaluation, ablations, a reward-hacking detector, a reusable library and a deployed demo.
 
 ---
 
