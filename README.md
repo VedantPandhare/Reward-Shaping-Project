@@ -63,6 +63,23 @@ Full tables: [`results/ablation.csv`](results/ablation.csv), [`results/per_seed.
   the environment's +100 (lander at rest), not necessarily on the pad.
 - **Caveat.** 3 seeds per variant; stds are small but this is not a statistical study.
 
+## Algorithm swap: DQN
+
+Same rewards, DQN instead of PPO (500k steps, 3 seeds, one env, hyper-parameters from the common
+RL-Zoo setting, not tuned). Raw-env evaluation, 100 episodes per seed.
+
+| Variant | Return | Landing | Crash | Timeout | Ep. length | Hack flag |
+|---|---|---|---|---|---|---|
+| hover_hack (DQN) | -231 ± 375 | 0.27 ± 0.28 | 0.50 ± 0.35 | 0.23 ± 0.28 | 413 ± 251 | 1/3 |
+| delta_fix (DQN) | 166 ± 29 | 0.75 ± 0.10 | 0.21 ± 0.09 | 0.04 ± 0.04 | 369 ± 177 | 0/3 |
+
+Per seed, `hover_hack`: seed 0 hovers (63% timeouts, bonus share 0.50, flagged), seed 1 diverged
+into constant crashes (return -750), seed 2 mostly lands (66%, timeout 6%). **Reading:** the hack is
+not PPO-only (one DQN seed shows the same hovering and the detector flags it), but it is far less
+consistent than under PPO, and DQN is a weaker, less stable learner here overall (even `delta_fix` lands
+only 75%). With an untuned 500k-step DQN and 3 seeds this is suggestive, not conclusive. Files:
+[`results/ablation_dqn.md`](results/ablation_dqn.md).
+
 ## Reproduce
 
 ```bash
@@ -71,6 +88,7 @@ pip install -e ".[dev,demo]"          # needs swig if Box2D fails to build
 python scripts/00_install_check.py
 python scripts/01_random_agent.py     # random policy: ~ -210 return
 python scripts/run_all.py             # all variants x seeds (about 20-40 min with 16 cores)
+python scripts/run_all.py --algo dqn --variants hover_hack delta_fix --steps 500000   # ~1.5 h
 python -m rewardlab.analysis          # results/ tables + plots
 python scripts/make_gifs.py           # GIFs + breakdown JSON
 python app/app.py                     # demo
