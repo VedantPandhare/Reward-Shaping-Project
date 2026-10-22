@@ -1,10 +1,9 @@
-"""Record a GIF + reward-breakdown JSON for each variant (seed 0) and copy small models to app/.
+"""Record a GIF + reward-breakdown JSON for each variant (seed 0).
 
     python scripts/make_gifs.py [--variants baseline hover_hack delta_fix] [--seed 0]
 """
 
 import argparse
-import shutil
 from pathlib import Path
 
 from rewardlab.envs import load_variants
@@ -24,7 +23,3 @@ for v in a.variants:
         continue
     out = Path("results/gifs") / f"{v}.gif"
     print(v, record(str(run), v, str(out), a.eval_seed))
-    dst = Path("app/models")
-    dst.mkdir(parents=True, exist_ok=True)
-    shutil.copy(run / "model.zip", dst / f"{v}.zip")
-    shutil.copy(out.with_suffix(".json"), dst / f"{v}.json")

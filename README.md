@@ -3,7 +3,7 @@
 A naive per-frame shaping bonus taught a PPO agent to **hover until timeout instead of landing**
 (100% of evaluation episodes timed out, 0% landed). An improvement-based (potential) reward fixed it:
 **99% landing, 0% timeouts**, across 3 seeds. A numeric detector flags the hacked runs and none of the
-healthy ones, and the whole thing ships as a small library plus a side-by-side demo.
+healthy ones, and the whole thing ships as a small library plus an in-browser 3D demo where you can fly against the agents.
 
 | Hover hack (naive bonus) | Fix (improvement-based) | Baseline |
 |---|---|---|
@@ -84,14 +84,15 @@ only 75%). With an untuned 500k-step DQN and 3 seeds this is suggestive, not con
 
 ```bash
 python -m venv .venv && .venv/Scripts/activate      # or source .venv/bin/activate
-pip install -e ".[dev,demo]"          # needs swig if Box2D fails to build
+pip install -e ".[dev]"          # needs swig if Box2D fails to build
 python scripts/00_install_check.py
 python scripts/01_random_agent.py     # random policy: ~ -210 return
 python scripts/run_all.py             # all variants x seeds (about 20-40 min with 16 cores)
 python scripts/run_all.py --algo dqn --variants hover_hack delta_fix --steps 500000   # ~1.5 h
 python -m rewardlab.analysis          # results/ tables + plots
 python scripts/make_gifs.py           # GIFs + breakdown JSON
-python app/app.py                     # demo
+python scripts/export_policies.py     # policies + results -> web/
+python -m http.server -d web 8000     # 3D demo at http://localhost:8000
 pytest -q
 ```
 One run: `python -m rewardlab.train --variant hover_hack --seed 0`. TensorBoard: `tensorboard --logdir runs`
@@ -116,10 +117,31 @@ The wrapper never changes observations or termination, always exposes `info["raw
 ## Layout
 
 `src/rewardlab/` library · `configs/` hyper-parameters and variants · `scripts/` runnable steps ·
-`app/` Gradio demo (pre-rendered GIFs + breakdown JSON in `app/assets/`) · `results/` committed outputs ·
-`tests/` wrapper and detector tests. Spec: [`lunar_lander_reward_shaping_project.md`](lunar_lander_reward_shaping_project.md).
+`web/` 3D browser demo (Three.js + planck.js; static site) · `results/` committed outputs ·
+`tests/` wrapper and detector tests.
 
-## Demo deployment (Hugging Face Spaces)
+## 3D demo (`web/`)
 
-`app/` is self-contained: copy `app/app.py` and `app/assets/` to a Gradio Space with a minimal
-`requirements.txt` (`gradio`, `matplotlib`, `numpy`). **Not deployed yet**, and no live link exists.
+A static site (no server): fly the lander yourself against any trained agent, or watch the hover-hack
+agent next to the delta-fix agent on identical terrain. Each panel has a live stacked reward-breakdown
+chart (the magenta hover bonus swamping everything is the tell) and the detector's bonus-share meter;
+wind (calm / breeze / storm) can be switched on.
+
+- **Physics:** a port of Gymnasium's `LunarLander-v3` to JavaScript (planck.js = Box2D). Terrain RNG
+  differs from numpy, so episodes are not seed-identical to Python, but behaviour is: exported
+  policies in the port give baseline/delta_fix 100% landing and hover_hack 100% timeouts on 40 episodes
+  (`web/tests/fidelity.mjs`), and the JS forward pass matches SB3's action on 400/400 recorded
+  observations (`web/tests/parity.mjs`).
+- **Rendering:** Three.js with shadows, bloom, particle exhaust and dust, a trail line that shows the hover loop.
+- **Policies:** the real seed-0 PPO networks exported as JSON by `scripts/export_policies.py`.
+- **Tests:** `cd web && npm install && npm test`; `node tests/shot.mjs` drives headless Chrome and saves screenshots.
+- **Robustness (wind), browser port, seed-0 policies, 60 episodes each:** landing under breeze (power 6) was
+  baseline 0.97, delta_fix 0.92, time_penalty 0.97; under storm (15) baseline 0.42, delta_fix 0.43,
+  delta_no_time 0.53, time_penalty 0.67. The fix is about as robust as baseline; all policies degrade
+  in a storm because none was trained with wind. One seed and 60 episodes: indicative only.
+
+### Deploying to Hugging Face Spaces
+
+`web/` is a ready static Space (`web/README.md` has the Space metadata, `sdk: static`). Create a new
+Static Space and push the contents of `web/` (without `node_modules`, `tests/shots`). The files are
+about 5 MB. **Not deployed yet**: no live link exists.

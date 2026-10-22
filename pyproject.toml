@@ -18,7 +18,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-demo = ["gradio"]
 dev = ["pytest", "ruff", "tensorboard", "moviepy"]
 
 [tool.setuptools.packages.find]
@@ -26,7 +25,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests", "scripts", "app"]
+src = ["src", "tests", "scripts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

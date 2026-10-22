@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Lunar Lander Reward-Hacking Lab</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/jsm/" } }
+</script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">&#128640;</span>
+    <div><h1>Lunar Lander <b>Reward-Hacking</b> Lab</h1>
+    <p>Same physics, same terrain. One agent was paid for hovering. Watch what it learned.</p></div>
+  </div>
+  <nav>
+    <button id="btn-results">Results</button>
+    <button id="btn-about">What am I seeing?</button>
+  </nav>
+</header>
+
+<section class="controls">
+  <label>Left pilot <select id="sel-left"></select></label>
+  <label>Right pilot <select id="sel-right"></select></label>
+  <label>Wind <select id="sel-wind">
+    <option value="0">Calm</option><option value="1">Breeze</option><option value="2">Storm</option></select></label>
+  <label>Speed <select id="sel-speed"><option>1</option><option>2</option><option>4</option></select></label>
+  <label>Seed <input id="in-seed" type="number" min="0" value="1"></label>
+  <button id="btn-new" title="New random terrain">&#127922; New terrain</button>
+  <button id="btn-restart" class="primary">&#8635; Restart</button>
+  <button id="btn-play" class="accent">&#127918; Take the controls</button>
+</section>
+
+<main class="arena" id="arena">
+  <div id="resultcard" class="resultcard"></div>
+  <div class="countdown" id="countdown"></div>
+  <!-- panels are cloned from this template -->
+</main>
+
+<template id="panel-tpl">
+  <section class="panel">
+    <div class="panel-head">
+      <span class="dot"></span><span class="drv-name"></span><span class="drv-blurb"></span>
+    </div>
+    <div class="viewport">
+      <canvas class="stage"></canvas>
+      <div class="status"></div>
+      <div class="hud">
+        <div><small>frame</small><b class="s-frame">0</b></div>
+        <div><small>altitude</small><b class="s-alt">0</b></div>
+        <div><small>speed</small><b class="s-speed">0</b></div>
+        <div><small>fuel used</small><b class="s-fuel">0</b></div>
+      </div>
+      <div class="framebar"><i class="bar-frame"></i><span>1000-frame time limit</span></div>
+    </div>
+    <div class="below">
+      <div class="scores">
+        <div><small>score (env reward)</small><b class="s-raw">0</b></div>
+        <div class="score-shaped"><small>what the agent optimises</small><b class="s-shaped">0</b></div>
+      </div>
+      <div class="hackbox">
+        <div class="hacklabel">custom-bonus share of reward <b class="s-share">0%</b></div>
+        <div class="sharebar"><i class="bar-share"></i><u></u></div>
+        <div class="hackalert">&#9888; REWARD HACKING DETECTED &mdash; collecting bonus, not landing</div>
+      </div>
+      <canvas class="chart"></canvas>
+      <div class="legend"></div>
+    </div>
+  </section>
+</template>
+
+<div class="touch" id="touch">
+  <button data-k="left">&#9664;</button><button data-k="up">&#9650;</button><button data-k="right">&#9654;</button>
+</div>
+<footer>
+  <span>Keys: <kbd>&#8592;</kbd>/<kbd>A</kbd> left engine &nbsp; <kbd>&#8593;</kbd>/<kbd>W</kbd> main engine &nbsp; <kbd>&#8594;</kbd>/<kbd>D</kbd> right engine &nbsp; <kbd>Space</kbd> restart</span>
+  <span>PPO agents trained in Python (Gymnasium + Stable-Baselines3), running live in your browser.</span>
+</footer>
+
+<div class="modal" id="modal-results"><div class="card wide">
+  <button class="close">&times;</button>
+  <h2>Results (3 seeds each, raw env reward, 100 episodes per seed)</h2>
+  <div id="results-body"></div>
+</div></div>
+<div class="modal" id="modal-about"><div class="card">
+  <button class="close">&times;</button>
+  <h2>What am I seeing?</h2>
+  <p>Both landers fly the same terrain with the same physics. They differ only in the <b>reward they were trained on</b>.</p>
+  <p><b style="color:#ff5a3c">Hover hack:</b> trained with <i>+1 per frame while upright and slow</i>. Landing ends the episode and stops the payments, so the agent learned to hover until the 1000-frame time limit &mdash; its training reward goes up while the behaviour gets worse.</p>
+  <p><b style="color:#3ddc97">Delta fix:</b> pays for <i>improvement</i> (potential-based shaping) plus a small time cost. Hovering earns nothing, so landing wins.</p>
+  <p>The chart under each lander splits every frame's reward into its parts. The magenta bonus bar dominating it is the tell. The &ldquo;custom-bonus share&rdquo; meter is the same number the project's hacking detector uses.</p>
+  <p>Physics is a port of Gymnasium's <code>LunarLander-v3</code> (Box2D via planck.js); the policies are the real trained PPO networks, exported as JSON.</p>
+</div></div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

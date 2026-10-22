@@ -1,0 +1,13 @@
+{
+  "name": "lunar-reward-lab-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/parity.mjs && node tests/fidelity.mjs"
+  },
+  "dependencies": {
+    "planck": "^1.4.2",
+    "puppeteer-core": "^25.16.0",
+    "three": "^0.186.1"
+  }
+}

@@ -5,3 +5,5 @@ runs/
 .pytest_cache/
 .ruff_cache/
 logs/
+web/node_modules/
+web/tests/shots/
