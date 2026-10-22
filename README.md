@@ -1,8 +1,8 @@
 # Lunar Lander Reward Shaping & Reward Hacking Lab
 
 A naive per-frame shaping bonus taught a PPO agent to **hover until timeout instead of landing**
-(100% of evaluation episodes timed out, 0% landed). An improvement-based (potential) reward fixed it:
-**99% landing, 0% timeouts**, across 3 seeds. A numeric detector flags the hacked runs and none of the
+(299 of 300 evaluation episodes timed out, 1 landed). An improvement-based (potential) reward fixed it:
+**99% landing, under 1% timeouts**, across 3 seeds. A numeric detector flags the hacked runs and none of the
 healthy ones, and the whole thing ships as a small library plus an in-browser 3D demo where you can fly against the agents.
 
 | Hover hack (naive bonus) | Fix (improvement-based) | Baseline |
@@ -51,8 +51,8 @@ Full tables: [`results/ablation.csv`](results/ablation.csv), [`results/per_seed.
   `delta_fix` (and was a bit faster/leaner), so the improvement-based form is what removes the exploit.
   The time penalty is not needed for this environment at this scale. `time_penalty` alone also helped
   slightly (shorter, cheaper landings).
-- **The failure generalises.** `tilt_only_hack` (bonus for low tilt only) failed the same way: 100%
-  timeouts. Hovering upright is the cheapest way to farm any per-frame state bonus.
+- **The failure generalises.** `tilt_only_hack` (bonus for low tilt only) failed the same way: 299 of 300
+  episodes timed out. Hovering upright is the cheapest way to farm any per-frame state bonus.
 - **Detector.** Flags (timeout rate > 30% *and* bonus share of return > 50%) fired on all 3 seeds of both
   hacks, and on none of the 18 other runs. Requiring both conditions matters: a baseline that merely
   hovers early in training has timeouts but no bonus share. During training the callback raised the
@@ -132,6 +132,11 @@ wind (calm / breeze / storm) can be switched on.
   policies in the port give baseline/delta_fix 100% landing and hover_hack 100% timeouts on 40 episodes
   (`web/tests/fidelity.mjs`), and the JS forward pass matches SB3's action on 400/400 recorded
   observations (`web/tests/parity.mjs`).
+- **Playing it:** the real game is hard for humans (a 13 m free fall in about 1.5 s, and any hull contact is a
+  crash), so *your* lander has Easy / Medium / Real difficulty: Easy = half speed, low gravity, auto-level and bouncy
+  side walls; Medium = 0.75x, lower gravity, auto-level, side walls; Real = exactly what the agents fly. The agents
+  never get the handicaps. A latency-limited scripted pilot (`web/tests/human_sim.mjs`) lands about 90% on Easy and 80%
+  on Medium (10 episodes each, indicative only); it crashes on Real.
 - **Rendering:** Three.js with shadows, bloom, particle exhaust and dust, a trail line that shows the hover loop.
 - **Policies:** the real seed-0 PPO networks exported as JSON by `scripts/export_policies.py`.
 - **Tests:** `cd web && npm install && npm test`; `node tests/shot.mjs` drives headless Chrome and saves screenshots.

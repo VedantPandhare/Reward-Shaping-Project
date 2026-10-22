@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Flight simulator - Reward Shaping &amp; Hacking Lab</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/jsm/" } }
+</script>
+</head>
+<body>
+<header>
+  <a class="back" href="index.html">&larr; Overview</a>
+  <div class="title"><span>Reward Lab</span><b>Flight simulator</b></div>
+  <nav>
+    <button id="btn-about">Glossary</button>
+    <button id="btn-results">Results</button>
+  </nav>
+</header>
+
+<section class="intro">
+  <p><b>Two landers, same terrain, same physics.</b> They differ only in the <em>reward they were trained on</em>.
+    Pick a pilot for each side, or take the controls yourself and race an agent. Each pilot's rule is shown above its screen.</p>
+</section>
+
+<section class="controls">
+  <label>Left pilot <select id="sel-left"></select></label>
+  <label>Right pilot <select id="sel-right"></select></label>
+  <label>Wind <select id="sel-wind">
+    <option value="0">Calm</option><option value="1">Breeze</option><option value="2">Storm</option></select></label>
+  <label>Speed <select id="sel-speed"><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label>
+  <label title="Only changes the lander YOU fly. The agents always fly the real game.">Your difficulty <select id="sel-diff">
+    <option value="easy" selected>Easy (slow-mo, low gravity, auto-level, side walls)</option>
+    <option value="medium">Medium (0.75x, lower gravity, auto-level, side walls)</option>
+    <option value="real">Real game (same as the agents)</option></select></label>
+  <label>Terrain seed <input id="in-seed" type="number" min="0" value="1"></label>
+  <button id="btn-new" title="New random terrain">New terrain</button>
+  <button id="btn-restart">Restart</button>
+  <button id="btn-play" class="solid">Take the controls</button>
+</section>
+
+<main class="arena" id="arena">
+  <div id="resultcard" class="resultcard"></div>
+  <div class="countdown" id="countdown"></div>
+</main>
+
+<template id="panel-tpl">
+  <section class="panel">
+    <div class="panel-head">
+      <div class="who"><span class="drv-name"></span><span class="badge"></span></div>
+      <p class="rule"></p>
+    </div>
+    <div class="viewport">
+      <canvas class="stage"></canvas>
+      <div class="status"></div>
+      <div class="hud">
+        <div title="Frames elapsed. The run is cut off at 1000."><small>Frame</small><b class="s-frame">0</b></div>
+        <div title="Height above the landing pad"><small>Altitude</small><b class="s-alt">0</b></div>
+        <div title="How fast the lander is moving"><small>Speed</small><b class="s-speed">0</b></div>
+        <div title="Fuel burned so far"><small>Fuel used</small><b class="s-fuel">0</b></div>
+      </div>
+      <div class="framebar"><i class="bar-frame"></i><span>1000-frame time limit</span></div>
+    </div>
+    <div class="below">
+      <div class="scores">
+        <div title="The real game's reward. This is what counts as doing well."><small>Game score</small><b class="s-raw">0</b></div>
+        <div class="score-shaped" title="Game reward plus the custom bonus this agent was trained on. This is what it was chasing."><small>Training reward (what it chased)</small><b class="s-shaped">0</b></div>
+      </div>
+      <div class="hackbox">
+        <div class="hacklabel">Share of its reward that comes from the custom bonus <b class="s-share">0%</b></div>
+        <div class="sharebar"><i class="bar-share"></i><u title="Detector alert level (50%)"></u></div>
+        <div class="hackalert">REWARD HACKING DETECTED: collecting the bonus instead of landing</div>
+      </div>
+      <canvas class="chart"></canvas>
+      <div class="legend"></div>
+    </div>
+  </section>
+</template>
+
+<div class="touch" id="touch">
+  <button data-k="left">&#9664;</button><button data-k="up">&#9650;</button><button data-k="right">&#9654;</button>
+</div>
+<footer>
+  <span>Keys: <kbd>&#8592;</kbd>/<kbd>A</kbd> left engine &nbsp; <kbd>&#8593;</kbd>/<kbd>W</kbd> main engine &nbsp; <kbd>&#8594;</kbd>/<kbd>D</kbd> right engine &nbsp; <kbd>Space</kbd> restart</span>
+  <span>Real trained PPO policies, running live in your browser on a port of Gymnasium's LunarLander-v3.</span>
+</footer>
+
+<div class="modal" id="modal-results"><div class="card wide">
+  <button class="close">&times;</button>
+  <h2>Results</h2>
+  <p class="dim">Mean &plusmn; std over 3 training seeds, 100 evaluation episodes each, scored with the unmodified game reward.</p>
+  <div id="results-body"></div>
+  <p><a class="textlink" href="index.html#results">Full write-up with figures &rarr;</a></p>
+</div></div>
+<div class="modal" id="modal-about"><div class="card">
+  <button class="close">&times;</button>
+  <h2>Glossary</h2>
+  <dl>
+    <dt>Reward</dt><dd>The points an agent receives each frame. It is never told what to do; it learns whatever earns the most points.</dd>
+    <dt>Game score vs training reward</dt><dd><b>Game score</b> is the real game's reward and is the fair measure of how well it flew. <b>Training reward</b> adds the custom bonus the agent was trained on. When the two diverge, the agent is chasing the bonus.</dd>
+    <dt>Reward hacking</dt><dd>The agent maximises the reward you wrote, not the goal you meant. Here the goal is "land softly on the pad".</dd>
+    <dt>Hover-hack agent</dt><dd>Trained with +1 point per frame while upright and slow. Landing ends the game and stops those points, so it learned to hover until the 1000-frame limit instead of landing.</dd>
+    <dt>Improvement reward ("delta")</dt><dd>The fix. It pays only for <em>improvement</em> since the last frame (potential-based shaping). Over a whole episode these payments cancel out, so hovering earns nothing and landing wins.</dd>
+    <dt>Time cost</dt><dd>A small penalty every frame, so wasting time costs points. We tested whether it was needed for the fix; it was not.</dd>
+    <dt>Bonus share meter</dt><dd>How much of the agent's total reward comes from the custom bonus. The project's hacking detector raises an alert when it passes 50% together with a high timeout rate.</dd>
+    <dt>Timed out</dt><dd>The run reached 1000 frames without ending: hovering, not landing.</dd>
+  </dl>
+  <p class="dim">Physics is a port of Gymnasium's LunarLander-v3 (Box2D via planck.js). The policies are the real trained PPO networks exported as JSON.</p>
+</div></div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

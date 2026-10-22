@@ -4,98 +4,284 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>Lunar Lander Reward-Hacking Lab</title>
-<link rel="stylesheet" href="style.css">
-<script type="importmap">
-{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/jsm/" } }
-</script>
+<title>Reward Shaping and Reward Hacking in Lunar Lander</title>
+<meta name="description" content="A multi-seed study of how a naive reward bonus teaches a reinforcement-learning agent to hover forever, how an improvement-based reward fixes it, and a detector that flags it.">
+<link rel="stylesheet" href="home.css">
 </head>
 <body>
-<header>
-  <div class="brand">
-    <span class="logo">&#128640;</span>
-    <div><h1>Lunar Lander <b>Reward-Hacking</b> Lab</h1>
-    <p>Same physics, same terrain. One agent was paid for hovering. Watch what it learned.</p></div>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="#top">Reward Shaping &amp; Hacking Lab</a>
+    <nav>
+      <a href="#background">Background</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#detector">Detector</a>
+      <a href="#generalization">Generalization</a>
+      <a href="#findings">Findings</a>
+      <a href="#reproduce">Reproduce</a>
+      <a class="cta" href="sim.html">Open simulator</a>
+    </nav>
   </div>
-  <nav>
-    <button id="btn-results">Results</button>
-    <button id="btn-about">What am I seeing?</button>
-  </nav>
 </header>
 
-<section class="controls">
-  <label>Left pilot <select id="sel-left"></select></label>
-  <label>Right pilot <select id="sel-right"></select></label>
-  <label>Wind <select id="sel-wind">
-    <option value="0">Calm</option><option value="1">Breeze</option><option value="2">Storm</option></select></label>
-  <label>Speed <select id="sel-speed"><option>1</option><option>2</option><option>4</option></select></label>
-  <label>Seed <input id="in-seed" type="number" min="0" value="1"></label>
-  <button id="btn-new" title="New random terrain">&#127922; New terrain</button>
-  <button id="btn-restart" class="primary">&#8635; Restart</button>
-  <button id="btn-play" class="accent">&#127918; Take the controls</button>
+<section class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">Reinforcement learning &middot; Reward design &middot; Safety</p>
+    <h1>When the score goes up and the behaviour gets worse</h1>
+    <p class="lede">A reinforcement-learning agent maximises the reward you write, not the goal you had in mind.
+      We train PPO agents to land a rocket in <i>LunarLander-v3</i>, add a plausible-looking shaping bonus, and show that the
+      agent learns to <b>hover until the clock runs out instead of landing</b>. We then fix the reward, measure both
+      behaviours across seeds, and build a detector that flags the failure from numbers rather than by watching clips.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="sim.html">Fly against the agents</a>
+      <a class="btn" href="#results">Jump to results</a>
+    </div>
+
+    <div class="duel">
+      <figure>
+        <img src="results/gifs/hover_hack.gif" alt="Hacked agent hovering" loading="eager">
+        <figcaption><span class="tag bad">Hacked reward</span> Paid +1 per frame for hovering. It never lands.</figcaption>
+      </figure>
+      <figure>
+        <img src="results/gifs/delta_fix.gif" alt="Fixed agent landing" loading="eager">
+        <figcaption><span class="tag good">Improvement-based reward</span> Same physics, same algorithm. It lands.</figcaption>
+      </figure>
+    </div>
+
+    <div class="stats">
+      <div><b>299 / 300</b><span>evaluation episodes of the hacked agent ran to the time limit (1 landed)</span></div>
+      <div><b>99%</b><span>landing rate after switching to an improvement-based reward (under 1% timeouts)</span></div>
+      <div><b>3 / 3</b><span>training seeds reproduce both the failure and the fix</span></div>
+      <div><b>0 / 18</b><span>healthy PPO runs flagged by the detector; 6 / 6 hacked runs flagged</span></div>
+    </div>
+  </div>
 </section>
 
-<main class="arena" id="arena">
-  <div id="resultcard" class="resultcard"></div>
-  <div class="countdown" id="countdown"></div>
-  <!-- panels are cloned from this template -->
+<main class="wrap article">
+
+<section id="abstract">
+  <h2>Summary</h2>
+  <p>Reward shaping adds extra reward terms to speed up learning. Done carelessly, it creates loopholes. In Lunar Lander
+    the episode is cut off after 1,000 frames and <em>landing ends the episode</em>, which also ends any per-frame payment.
+    A bonus of +1 for every frame the lander is upright and slow therefore out-earns a successful landing, and PPO finds this.
+    Across three seeds the hacked agent's training reward climbs to roughly 1,000 while its evaluation score on the true
+    environment reward is &minus;78 and it lands in only 1 of 300 evaluation episodes.</p>
+  <p>Replacing the bonus with <em>improvement-based</em> (potential-based) shaping removes the loophole: the extra reward telescopes
+    over an episode, so there is nothing to farm by waiting. We evaluate eight reward designs on three seeds each, with all
+    scores taken from the unmodified environment reward, and show the failure is not specific to one bonus (a tilt-only bonus fails the same way)
+    and not purely a PPO artefact (one of three DQN seeds hovers too), though it is less consistent there.</p>
+</section>
+
+<section id="background">
+  <h2>1. Background</h2>
+  <h3>Reinforcement learning in one paragraph</h3>
+  <p>An <b>agent</b> repeatedly observes an <b>environment</b>, picks an <b>action</b>, and receives a numerical <b>reward</b>.
+    It is never told what to do; it learns which behaviour earns the most total reward. In Lunar Lander the agent sees 8 numbers
+    (position, velocity, tilt, spin, two leg-contact flags) and chooses one of 4 actions each frame: do nothing, fire the left,
+    main or right engine. The built-in reward pays for moving closer to the pad, slowing down and staying upright, charges a little for fuel,
+    and gives +100 for a safe landing or &minus;100 for a crash.</p>
+  <h3>Reward hacking</h3>
+  <p>The reward function is the only thing that tells the agent what you want. If it contains a loophole, a capable optimiser
+    finds it. This is an instance of specification gaming, closely related to Goodhart's law:
+    when a measure becomes the target, it stops being a good measure. The dangerous part is that <b>the training score rises
+    while the behaviour you care about gets worse</b>, so monitoring the score alone hides the problem.</p>
+  <h3>Potential-based shaping</h3>
+  <p>The safe form of shaping (Ng, Harada &amp; Russell, 1999) defines a potential &Phi;(s) that says how good a state is and pays the
+    <em>change</em> in potential:</p>
+  <p class="formula">F(s, s&prime;) = &gamma;&middot;&Phi;(s&prime;) &minus; &Phi;(s)</p>
+  <p>Summed over an episode these terms telescope to roughly &Phi;(end) &minus; &Phi;(start), so shaping of this form does not change which policy is optimal;
+    it only helps learning. A per-frame bonus for <em>being in</em> a good state has no such guarantee.</p>
+</section>
+
+<section id="method">
+  <h2>2. Method</h2>
+  <div class="grid2">
+    <div>
+      <h3>Setup</h3>
+      <ul>
+        <li><b>Environment:</b> Gymnasium <code>LunarLander-v3</code> (Box2D physics, 50 frames per second, 1,000-frame limit).</li>
+        <li><b>Algorithm:</b> PPO (Stable-Baselines3, 16 parallel environments, 1M steps, standard published hyper-parameters). DQN for a robustness check.</li>
+        <li><b>Seeds:</b> 3 per reward design, training seeds 0&ndash;2.</li>
+        <li><b>Intervention:</b> a thin <code>RewardShapingWrapper</code> adds custom reward terms. It never changes observations, termination or truncation (unit-tested), and always records the original reward and each custom term.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Evaluation protocol</h3>
+      <ul>
+        <li><b>Raw reward only.</b> Scores come from the unmodified environment reward, so a custom bonus can never inflate a result.</li>
+        <li>100 deterministic episodes per model, evaluation seeds disjoint from training seeds.</li>
+        <li>Per episode we log return, length, <em>landed</em>, <em>crashed</em>, <em>timed out</em> (hit 1,000 frames), and fuel used.</li>
+        <li>"Landed" is the environment's +100 (lander at rest); we also record whether it was on the pad.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>The eight reward designs</h3>
+  <p>Every design adds something to the built-in reward. The "rule" column says in plain terms what was added.</p>
+  <div class="tablewrap">
+  <table class="variants">
+    <thead><tr><th>Design</th><th>What is added to the built-in reward</th><th>Why we tried it</th><th>What happened (PPO)</th></tr></thead>
+    <tbody>
+      <tr><td><code>baseline</code></td><td>Nothing.</td><td>Reference.</td><td>Lands 98% of the time.</td></tr>
+      <tr><td><code>time_penalty</code></td><td>&minus;0.05 every frame, so wasting time costs points.</td><td>Does urgency help?</td><td>Still lands (100%), slightly faster and cheaper.</td></tr>
+      <tr class="bad"><td><code>hover_hack</code></td><td>+1 every frame the lander is upright and slow.</td><td>A plausible-looking bonus with a hidden loophole.</td><td><b>Hovers to timeout in 99.7% of episodes.</b></td></tr>
+      <tr class="good"><td><code>delta_fix</code></td><td>Pays the <em>improvement</em> in an upright-and-slow score each frame, plus &minus;0.05 per frame.</td><td>The principled fix.</td><td><b>Lands 99%, under 1% timeouts.</b></td></tr>
+      <tr><td><code>delta_no_time</code></td><td>The improvement term only, no per-frame cost.</td><td>Ablation: does the time cost matter?</td><td>Lands 99%. The time cost was not needed.</td></tr>
+      <tr class="bad"><td><code>tilt_only_hack</code></td><td>+1 every frame the lander is level, ignoring position and speed.</td><td>Does the failure generalise to another bonus?</td><td>Times out in 99.7% of episodes.</td></tr>
+      <tr><td><code>fuel_efficient</code></td><td>Fuel cost doubled.</td><td>A trade-off, not a hack.</td><td>Lands 77%; only 45% of episodes end on the pad.*</td></tr>
+      <tr><td><code>soft_landing</code></td><td>Penalty on touchdown speed and tilt.</td><td>A trade-off, not a hack.</td><td>Lands 79%; 66% end on the pad.*</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">* Trained for 500k steps instead of 1M, so not directly comparable with the other rows.</p>
+</section>
+
+<section id="results">
+  <h2>3. Results</h2>
+  <p>All values are mean &plusmn; standard deviation over 3 seeds, from 100 raw-reward episodes per seed.</p>
+  <div id="ablation-table" class="tablewrap"><p class="note">Loading table&hellip;</p></div>
+
+  <h3>The score goes up while the behaviour gets worse</h3>
+  <div class="grid2 figs">
+    <figure>
+      <img src="results/learning_curves_shaped.png" alt="Training reward by design">
+      <figcaption><b>Figure 1a.</b> What the agent is optimising (training reward including the bonus). The hacked agent's reward soars to about 1,000.</figcaption>
+    </figure>
+    <figure>
+      <img src="results/learning_curves.png" alt="Environment reward by design">
+      <figcaption><b>Figure 1b.</b> The true environment reward, same runs (stochastic policy during training). The hacked agent plateaus far below the others; deterministic evaluation of the final policy gives &minus;78.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Where the reward comes from</h3>
+  <div class="grid2 figs">
+    <figure>
+      <img src="results/breakdown_hover_hack.png" alt="Reward breakdown of hacked agent">
+      <figcaption><b>Figure 2a.</b> Hacked agent over one 1,000-frame episode. The red bonus term dwarfs everything the environment pays.</figcaption>
+    </figure>
+    <figure>
+      <img src="results/breakdown_delta_fix.png" alt="Reward breakdown of fixed agent">
+      <figcaption><b>Figure 2b.</b> Fixed agent. The shaping term is small and the episode ends in a landing.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Behaviour of all designs</h3>
+  <div class="gifgrid">
+    <figure><img src="results/gifs/baseline.gif" alt="baseline" loading="lazy"><figcaption><code>baseline</code></figcaption></figure>
+    <figure><img src="results/gifs/time_penalty.gif" alt="time_penalty" loading="lazy"><figcaption><code>time_penalty</code></figcaption></figure>
+    <figure class="bad"><img src="results/gifs/hover_hack.gif" alt="hover_hack" loading="lazy"><figcaption><code>hover_hack</code></figcaption></figure>
+    <figure class="good"><img src="results/gifs/delta_fix.gif" alt="delta_fix" loading="lazy"><figcaption><code>delta_fix</code></figcaption></figure>
+    <figure><img src="results/gifs/delta_no_time.gif" alt="delta_no_time" loading="lazy"><figcaption><code>delta_no_time</code></figcaption></figure>
+    <figure class="bad"><img src="results/gifs/tilt_only_hack.gif" alt="tilt_only_hack" loading="lazy"><figcaption><code>tilt_only_hack</code></figcaption></figure>
+    <figure><img src="results/gifs/fuel_efficient.gif" alt="fuel_efficient" loading="lazy"><figcaption><code>fuel_efficient</code></figcaption></figure>
+    <figure><img src="results/gifs/soft_landing.gif" alt="soft_landing" loading="lazy"><figcaption><code>soft_landing</code></figcaption></figure>
+  </div>
+  <p class="note">One evaluation episode per design, seed-0 model. Clips are cropped to the first 12 seconds.</p>
+
+  <h3>Fuel and landing trade-offs</h3>
+  <figure class="single">
+    <img src="results/tradeoff.png" alt="fuel versus landing trade-off">
+    <figcaption><b>Figure 3.</b> Fuel used versus landing rate. Dots are seeds, markers are means with standard deviation.</figcaption>
+  </figure>
+</section>
+
+<section id="detector">
+  <h2>4. A numeric hacking detector</h2>
+  <p>Watching clips does not scale. <code>HackingDetector</code> computes metrics over a rolling window of episodes, usable as a Stable-Baselines3 callback during training or on saved evaluation logs:</p>
+  <ul>
+    <li><b>Timeout rate:</b> fraction of episodes truncated at 1,000 frames. Hovering shows up as a spike.</li>
+    <li><b>Mean episode length:</b> drifts toward 1,000.</li>
+    <li><b>Custom-term share:</b> |sum of custom reward terms| divided by the total absolute reward. If a hand-written bonus supplies most of the agent's reward, it is probably being exploited. Potential-based shaping telescopes, so its share stays small.</li>
+  </ul>
+  <p>An alert needs <b>both</b> a timeout rate above 30% and a custom-term share above 50% (thresholds are configurable). Requiring both matters: an agent that merely stalls early in training has timeouts but no bonus share.</p>
+  <div class="callout">
+    <b>Outcome.</b> The detector flagged all 3 <code>hover_hack</code> and all 3 <code>tilt_only_hack</code> runs, and none of the 18 other PPO runs.
+    During training the <code>hover_hack</code> warnings fired between roughly 0.5M and 0.65M steps, well before the end of training.
+  </div>
+</section>
+
+<section id="generalization">
+  <h2>5. Does it generalise?</h2>
+  <h3>A second hack</h3>
+  <p><code>tilt_only_hack</code> (+1 per frame for staying level, nothing about position or speed) also times out in 99.7% of episodes (299 of 300). Any per-frame bonus for being in a state is farmable when the episode can be prolonged.</p>
+  <h3>A second algorithm (DQN)</h3>
+  <p>Same rewards, DQN instead of PPO (500k steps, 3 seeds, untuned).</p>
+  <div id="dqn-table" class="tablewrap"></div>
+  <p>One of three <code>hover_hack</code> seeds hovers (63% timeouts, bonus share 0.50, flagged); one diverged into constant crashes; one mostly lands. So the failure is <b>not PPO-only</b>, but it is much less consistent, and DQN is a weaker learner here overall (even the fix lands only 75%). With an untuned 500k-step DQN and three seeds, treat this as suggestive, not conclusive.</p>
+  <h3>Wind (robustness)</h3>
+  <p>Policies trained without wind, evaluated with Gymnasium's wind and turbulence (browser port of the environment, seed-0 policies, 60 episodes each):</p>
+  <div class="tablewrap">
+    <table class="narrow">
+      <thead><tr><th>Landing rate</th><th>Calm</th><th>Breeze</th><th>Storm</th></tr></thead>
+      <tbody>
+        <tr><td><code>baseline</code></td><td>1.00</td><td>0.97</td><td>0.42</td></tr>
+        <tr><td><code>delta_fix</code></td><td>1.00</td><td>0.92</td><td>0.43</td></tr>
+        <tr><td><code>delta_no_time</code></td><td>1.00</td><td>0.90</td><td>0.53</td></tr>
+        <tr><td><code>time_penalty</code></td><td>1.00</td><td>0.97</td><td>0.67</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>All designs degrade in a storm because none was trained with wind, and the fix is about as robust as the baseline. One seed and 60 episodes: indicative only.</p>
+</section>
+
+<section id="findings">
+  <h2>6. Findings</h2>
+  <ol class="findings">
+    <li><b>The hack is reliable.</b> A +1 per-frame bonus for being upright and slow made the PPO agent hover to timeout in 3 of 3 seeds (299 of 300 episodes timed out, 1 landed, &minus;78 true return).</li>
+    <li><b>Training reward hid it.</b> Training reward rose to about 1,000 while the true score stayed low. Timeout rate, episode length and the bonus share exposed it.</li>
+    <li><b>Improvement-based shaping fixes it.</b> Paying the change in an upright-and-slow score restored 99% landings with under 1% timeouts.</li>
+    <li><b>The structure matters, not the time cost.</b> Removing the per-frame time cost (<code>delta_no_time</code>) changed nothing important here, so the delta form is what removes the loophole.</li>
+    <li><b>The failure is not specific to one bonus,</b> and appears under a second algorithm (1 of 3 DQN seeds), though less consistently.</li>
+    <li><b>Trade-offs are a different problem.</b> Doubling fuel cost or penalising touchdown speed lowered landing rates and often ended off the pad &mdash; a reminder that "landed" and "landed on the pad" are different outcomes.</li>
+  </ol>
+
+  <h3>Limitations</h3>
+  <ul>
+    <li>Three seeds per design: standard deviations are small, but this is an engineering study, not a statistical one.</li>
+    <li>One environment, hand-picked bonus magnitudes, and untuned DQN. The DQN and wind results are indicative.</li>
+    <li>"Steps to reach a score" uses stochastic training returns, which sit below deterministic evaluation, so it is not reported as a headline number.</li>
+    <li>The browser simulator is a faithful behavioural port of the environment (physics via Box2D), not bit-identical to the Python run; the headline numbers above all come from the Python evaluation.</li>
+  </ul>
+</section>
+
+<section id="reproduce">
+  <h2>7. Reproduce and reuse</h2>
+  <p>The wrapper and detector are packaged as a small library (<code>rewardlab</code>, installable with <code>pip install -e .</code>) with tests.</p>
+<pre><code>import gymnasium as gym
+from stable_baselines3 import PPO
+from rewardlab import RewardShapingWrapper, HackingCallback, make_reward_fn
+
+env = RewardShapingWrapper(gym.make("LunarLander-v3"), make_reward_fn("hover_hack"))
+model = PPO("MlpPolicy", env)
+model.learn(100_000, callback=HackingCallback(episodes_path="episodes.csv"))</code></pre>
+<pre><code>python scripts/run_all.py            # all designs x seeds
+python -m rewardlab.analysis         # tables and figures
+python scripts/export_policies.py    # export policies for this site
+python -m http.server -d web 8000    # open the site and the simulator</code></pre>
+  <p>Every run is defined by (design, seed, config); evaluation seeds differ from training seeds; dependency versions are pinned in <code>requirements.txt</code>.</p>
+</section>
+
+<section id="simulator" class="simcta">
+  <h2>Try it yourself</h2>
+  <p>The simulator runs the real trained policies in your browser on a port of the environment. Race one of them, or watch the hacked and fixed agents side by side with a live breakdown of where their reward comes from.</p>
+  <div class="stills">
+    <figure><img src="media/sim_hack_vs_fix.jpg" alt="Simulator: fix agent landed, hack agent hovering" loading="lazy"><figcaption>Hacked vs fixed agent, with the live reward breakdown and bonus-share meter.</figcaption></figure>
+    <figure><img src="media/sim_you_vs_agent.jpg" alt="Simulator: you versus an agent" loading="lazy"><figcaption>You versus an agent on the same terrain. Easy, Medium and Real difficulty for your lander.</figcaption></figure>
+  </div>
+  <a class="btn primary big" href="sim.html">Open the simulator</a>
+</section>
+
 </main>
 
-<template id="panel-tpl">
-  <section class="panel">
-    <div class="panel-head">
-      <span class="dot"></span><span class="drv-name"></span><span class="drv-blurb"></span>
-    </div>
-    <div class="viewport">
-      <canvas class="stage"></canvas>
-      <div class="status"></div>
-      <div class="hud">
-        <div><small>frame</small><b class="s-frame">0</b></div>
-        <div><small>altitude</small><b class="s-alt">0</b></div>
-        <div><small>speed</small><b class="s-speed">0</b></div>
-        <div><small>fuel used</small><b class="s-fuel">0</b></div>
-      </div>
-      <div class="framebar"><i class="bar-frame"></i><span>1000-frame time limit</span></div>
-    </div>
-    <div class="below">
-      <div class="scores">
-        <div><small>score (env reward)</small><b class="s-raw">0</b></div>
-        <div class="score-shaped"><small>what the agent optimises</small><b class="s-shaped">0</b></div>
-      </div>
-      <div class="hackbox">
-        <div class="hacklabel">custom-bonus share of reward <b class="s-share">0%</b></div>
-        <div class="sharebar"><i class="bar-share"></i><u></u></div>
-        <div class="hackalert">&#9888; REWARD HACKING DETECTED &mdash; collecting bonus, not landing</div>
-      </div>
-      <canvas class="chart"></canvas>
-      <div class="legend"></div>
-    </div>
-  </section>
-</template>
-
-<div class="touch" id="touch">
-  <button data-k="left">&#9664;</button><button data-k="up">&#9650;</button><button data-k="right">&#9654;</button>
-</div>
-<footer>
-  <span>Keys: <kbd>&#8592;</kbd>/<kbd>A</kbd> left engine &nbsp; <kbd>&#8593;</kbd>/<kbd>W</kbd> main engine &nbsp; <kbd>&#8594;</kbd>/<kbd>D</kbd> right engine &nbsp; <kbd>Space</kbd> restart</span>
-  <span>PPO agents trained in Python (Gymnasium + Stable-Baselines3), running live in your browser.</span>
+<footer class="foot">
+  <div class="wrap">
+    <p><b>References.</b> Ng, Harada &amp; Russell (1999), <i>Policy invariance under reward transformations</i>. Schulman et al. (2017), <i>Proximal Policy Optimization Algorithms</i>. Mnih et al. (2015), <i>Human-level control through deep reinforcement learning</i>. Gymnasium <code>LunarLander-v3</code>; Stable-Baselines3.</p>
+    <p>Built by Vedant Pandhare. Free and open-source tooling throughout; trained on a laptop CPU.</p>
+  </div>
 </footer>
 
-<div class="modal" id="modal-results"><div class="card wide">
-  <button class="close">&times;</button>
-  <h2>Results (3 seeds each, raw env reward, 100 episodes per seed)</h2>
-  <div id="results-body"></div>
-</div></div>
-<div class="modal" id="modal-about"><div class="card">
-  <button class="close">&times;</button>
-  <h2>What am I seeing?</h2>
-  <p>Both landers fly the same terrain with the same physics. They differ only in the <b>reward they were trained on</b>.</p>
-  <p><b style="color:#ff5a3c">Hover hack:</b> trained with <i>+1 per frame while upright and slow</i>. Landing ends the episode and stops the payments, so the agent learned to hover until the 1000-frame time limit &mdash; its training reward goes up while the behaviour gets worse.</p>
-  <p><b style="color:#3ddc97">Delta fix:</b> pays for <i>improvement</i> (potential-based shaping) plus a small time cost. Hovering earns nothing, so landing wins.</p>
-  <p>The chart under each lander splits every frame's reward into its parts. The magenta bonus bar dominating it is the tell. The &ldquo;custom-bonus share&rdquo; meter is the same number the project's hacking detector uses.</p>
-  <p>Physics is a port of Gymnasium's <code>LunarLander-v3</code> (Box2D via planck.js); the policies are the real trained PPO networks, exported as JSON.</p>
-</div></div>
-
-<script type="module" src="src/main.js"></script>
+<script src="home.js"></script>
 </body>
 </html>

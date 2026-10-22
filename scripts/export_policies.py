@@ -53,8 +53,11 @@ for variant in load_variants():
 (out / "policies.json").write_text(json.dumps(policies, separators=(",", ":")))
 (out / "parity.json").write_text(json.dumps(parity, separators=(",", ":")))
 res = Path("web/results")
-res.mkdir(parents=True, exist_ok=True)
 pd.read_csv("results/ablation.csv").to_json(res / "ablation.json", orient="records", indent=1)
-for name in ("learning_curves.png", "tradeoff.png"):
-    shutil.copy(Path("results") / name, res / name)
+pd.read_csv("results/ablation_dqn.csv").to_json(res / "ablation_dqn.json", orient="records", indent=1)
+for png in Path("results").glob("*.png"):
+    shutil.copy(png, res / png.name)
+(res / "gifs").mkdir(parents=True, exist_ok=True)
+for gif in Path("results/gifs").glob("*.gif"):
+    shutil.copy(gif, res / "gifs" / gif.name)
 print("policies.json bytes:", (out / "policies.json").stat().st_size)

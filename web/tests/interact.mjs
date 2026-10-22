@@ -22,7 +22,7 @@ await page.setViewport({ width: 1500, height: 1000 });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-await page.goto(`http://localhost:${server.address().port}/index.html`, { waitUntil: "networkidle0" });
+await page.goto(`http://localhost:${server.address().port}/${process.env.PAGE ?? "sim.html"}`, { waitUntil: "networkidle0" });
 await page.select("#sel-left", "human");
 const fuel = () => page.evaluate(() => window.__lab.state.envs[0].returns.fuel);
 await page.evaluate(() => window.__lab.advance(10));

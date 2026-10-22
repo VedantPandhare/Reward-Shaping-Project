@@ -20,6 +20,17 @@ from rewardlab.envs import load_variants
 ROOT = Path(__file__).resolve().parents[2]
 RUNS = ROOT / "runs"
 RESULTS = ROOT / "results"
+COLORS = {
+    "baseline": "#5b6573", "time_penalty": "#8d99ab", "hover_hack": "#c8102e", "delta_fix": "#0b3d91",
+    "delta_no_time": "#4f7fd1", "tilt_only_hack": "#e06a7a", "fuel_efficient": "#2a9d8f",
+    "soft_landing": "#b08900",
+}
+TERM_COLORS = {
+    "distance": "#4fa3ff", "speed": "#9aa7b8", "tilt": "#6b7a90", "legs": "#35c2b0", "fuel": "#f5c542",
+    "terminal": "#3b4452", "hover_bonus": "#c8102e", "tilt_bonus": "#c8102e",
+    "delta_shaping": "#0b3d91", "time_penalty": "#b8c0cc", "extra_fuel": "#c9a227",
+    "touchdown_penalty": "#ff8a7a",
+}
 METRICS = ["mean_return", "landing_rate", "crash_rate", "timeout_rate", "mean_length", "mean_fuel",
            "custom_share", "steps_to_150"]
 
@@ -110,8 +121,8 @@ def plot_curves(variants: list[str], path: Path, key: str = "raw_return", title:
         if grid is None:
             continue
         m, s = ys.mean(0), ys.std(0)
-        ax.plot(grid, m, label=f"{v} (n={len(ys)})")
-        ax.fill_between(grid, m - s, m + s, alpha=0.2)
+        ax.plot(grid, m, color=COLORS.get(v), lw=2, label=f"{v} (n={len(ys)})")
+        ax.fill_between(grid, m - s, m + s, color=COLORS.get(v), alpha=0.16, lw=0)
     ax.axhline(200, color="gray", ls="--", lw=0.8)
     ax.set(xlabel="training timesteps", ylabel=ylabel, title=title)
     ax.legend()
@@ -129,15 +140,42 @@ def plot_tradeoff(df: pd.DataFrame, path: Path, variants=("baseline", "time_pena
         d = df[df["variant"] == v]
         if d.empty:
             continue
-        ax.scatter(d["mean_fuel"], d["landing_rate"], alpha=0.5)
+        ax.scatter(d["mean_fuel"], d["landing_rate"], alpha=0.4, color=COLORS.get(v))
         ax.errorbar(d["mean_fuel"].mean(), d["landing_rate"].mean(), xerr=d["mean_fuel"].std(ddof=0),
-                    yerr=d["landing_rate"].std(ddof=0), fmt="o", capsize=3, label=v)
+                    yerr=d["landing_rate"].std(ddof=0), fmt="o", capsize=3, label=v, color=COLORS.get(v))
     ax.set(xlabel="mean fuel used per episode", ylabel="landing rate (raw-env eval)",
            title="Fuel vs landing trade-off (dots = seeds)")
     ax.legend()
     ax.grid(alpha=0.3)
     fig.tight_layout()
     fig.savefig(path, dpi=130)
+    plt.close(fig)
+
+
+def plot_breakdown(variant: str, path: Path, window: int = 10):
+    """Stacked per-frame reward by term from the recorded rollout (results/gifs/<variant>.json)."""
+    steps = json.loads((RESULTS / "gifs" / f"{variant}.json").read_text())["steps"]
+    skip = {"t", "action", "raw_reward", "total_reward"}
+    keys = [k for k in TERM_COLORS if any(k in st for st in steps)]
+    keys += sorted({k for st in steps for k in st} - set(keys) - skip)
+    n = len(steps) // window + 1
+    fig, ax = plt.subplots(figsize=(8, 3.6))
+    pos, neg = np.zeros(n), np.zeros(n)
+    for k in keys:
+        vals = np.array([sum(st.get(k, 0.0) for st in steps[i * window:(i + 1) * window])
+                         for i in range(n)])
+        if not np.any(vals):
+            continue
+        ax.bar(np.arange(n) * window, vals, width=window, bottom=np.where(vals >= 0, pos, neg),
+               color=TERM_COLORS.get(k, "#999"), label=k.replace("_", " "))
+        pos += np.clip(vals, 0, None)
+        neg += np.clip(vals, None, 0)
+    ax.axhline(0, color="#444", lw=0.6)
+    ax.set(xlabel="frame", ylabel=f"reward per {window} frames", title=f"Where the reward comes from: {variant}")
+    ax.legend(fontsize=7, ncol=4, frameon=False)
+    ax.grid(alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(path, dpi=140)
     plt.close(fig)
 
 
@@ -161,6 +199,9 @@ def main():
                 RESULTS / "learning_curves_shaped.png", key="shaped_return",
                 title="What the agent optimises (shaped return)", ylabel="shaped return")
     plot_tradeoff(df, RESULTS / "tradeoff.png")
+    for v in ("baseline", "hover_hack", "delta_fix"):
+        if (RESULTS / "gifs" / f"{v}.json").exists():
+            plot_breakdown(v, RESULTS / f"breakdown_{v}.png")
 
 
 if __name__ == "__main__":

@@ -33,13 +33,19 @@ await page.setViewport({ width: 1500, height: 1000 });
 const errors = [];
 page.on("console", (m) => { if (["error", "warning"].includes(m.type())) errors.push(`[${m.type()}] ${m.text()}`); });
 page.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}`));
-await page.goto(`http://localhost:${port}/index.html`, { waitUntil: "networkidle0" });
+await page.goto(`http://localhost:${port}/${process.env.PAGE ?? "sim.html"}`, { waitUntil: "networkidle0" });
 if (left) await page.select("#sel-left", left);
 if (right) await page.select("#sel-right", right);
 if (speed) await page.select("#sel-speed", speed);
 let t0 = Date.now();
 // times are simulation frames: advance deterministically, let the renderer catch up, then shoot
 let done = 0;
+if (!(await page.evaluate(() => !!window.__lab))) {
+  await new Promise((r) => setTimeout(r, 1500));
+  await page.screenshot({ path: join(out, "home.png"), fullPage: true });
+  console.log("home shot");
+  times.length = 0;
+}
 for (const f of times) {
   await page.evaluate((n) => window.__lab.advance(n), f - done);
   done = f;

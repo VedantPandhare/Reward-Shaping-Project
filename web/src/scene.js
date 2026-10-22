@@ -152,13 +152,13 @@ export function buildTerrain(terrain, helipad) {
   stripe.rotation.x = -Math.PI / 2;
   stripe.position.set(pad.position.x, helipad.y + 0.005, 0.5);
   group.add(stripe);
-  const beaconMat = new THREE.MeshBasicMaterial({ color: 0x40ffb0 });
+  const beaconMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const beacons = [];
   for (const x of [helipad.x1, helipad.x2]) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 8), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
     pole.position.set(x, helipad.y + 0.8, 0.5);
     group.add(pole);
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.33), new THREE.MeshBasicMaterial({ color: 0xffd400, side: THREE.DoubleSide }));
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.33), new THREE.MeshBasicMaterial({ color: 0xf2f4f8, side: THREE.DoubleSide }));
     flag.position.set(x + (x === helipad.x1 ? 0.4 : -0.4), helipad.y + 1.4, 0.5);
     group.add(flag);
     const light = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), beaconMat.clone());
@@ -167,7 +167,7 @@ export function buildTerrain(terrain, helipad) {
     beacons.push(light);
   }
   for (let i = 0; i < 7; i++) { // pad edge lights
-    const l = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff5a3c }));
+    const l = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfc3d21 }));
     l.position.set(helipad.x1 + (padW * i) / 6, helipad.y + 0.04, 2.05);
     group.add(l);
     beacons.push(l);
@@ -286,8 +286,8 @@ export function buildLander(color) {
     g.translate(0, h / 2, 0); // base at origin, tip at +Y
     return new THREE.Mesh(g, mat);
   };
-  const outer = cone(0.2, 1.3, flameMat(0xff7a1a, 0.75));
-  const inner = cone(0.1, 0.8, flameMat(0xfff2c0, 0.95));
+  const outer = cone(0.2, 1.3, flameMat(0xffd9a0, 0.7));
+  const inner = cone(0.1, 0.8, flameMat(0xffffff, 0.95));
   mainFlame.add(outer, inner);
   mainFlame.rotation.z = Math.PI; // tip points down
   mainFlame.position.set(0, -0.62, 0);
@@ -296,14 +296,14 @@ export function buildLander(color) {
 
   const sideFlames = [];
   for (const dir of [-1, 1]) {
-    const f = cone(0.08, 0.5, flameMat(0xffa040, 0.85));
+    const f = cone(0.08, 0.5, flameMat(0xffe8c4, 0.85));
     f.rotation.z = -dir * Math.PI / 2; // tip points outward
     f.position.set(dir * 0.7, 0.2, 0);
     f.visible = false;
     body.add(f);
     sideFlames.push(f);
   }
-  const light = new THREE.PointLight(0xff9a40, 0, 9, 2);
+  const light = new THREE.PointLight(0xffe2b8, 0, 9, 2);
   light.position.set(0, -1.0, 1.2);
   body.add(light);
 

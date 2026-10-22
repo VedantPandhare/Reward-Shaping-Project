@@ -8,14 +8,16 @@ import { W, H, MAX_STEPS } from "./lander_env.js";
 import { Particles, buildLander, buildSky, buildTerrain } from "./scene.js";
 
 const TERM_COLORS = {
-  distance: "#4cc9f0", speed: "#f8961e", tilt: "#90be6d", legs: "#b388eb", fuel: "#f94144",
-  terminal: "#adb5bd", hover_bonus: "#ff2bd6", tilt_bonus: "#ff2bd6", delta_shaping: "#ffd60a",
-  time_penalty: "#8d99ae", extra_fuel: "#e5383b", touchdown_penalty: "#ff7b00",
+  distance: "#4fa3ff", speed: "#ffffff", tilt: "#7f8ea3", legs: "#35c2b0", fuel: "#f5c542",
+  terminal: "#4a5566", hover_bonus: "#fc3d21", tilt_bonus: "#fc3d21", delta_shaping: "#2a5cc4",
+  time_penalty: "#b8c0cc", extra_fuel: "#c9a227", touchdown_penalty: "#ff8a7a",
 };
 const BONUS_TERMS = new Set(["hover_bonus", "tilt_bonus"]);
 export const TERM_LABELS = {
-  hover_bonus: "hover bonus", tilt_bonus: "tilt bonus", delta_shaping: "delta shaping",
-  time_penalty: "time penalty", extra_fuel: "extra fuel", touchdown_penalty: "touchdown penalty",
+  distance: "nearer the pad", speed: "slowing down", tilt: "upright", legs: "legs down", fuel: "fuel cost",
+  terminal: "landing / crash", hover_bonus: "hover bonus (custom)", tilt_bonus: "stay-level bonus (custom)",
+  delta_shaping: "improvement bonus (custom)", time_penalty: "time cost (custom)",
+  extra_fuel: "extra fuel cost (custom)", touchdown_penalty: "touchdown penalty (custom)",
 };
 const GROUP = 5; // frames per chart bar
 const CHART_BARS = 70;
@@ -136,11 +138,12 @@ export class Panel {
     this.statusEl.className = "status";
     this.statusEl.textContent = "";
     this.$(".drv-name").textContent = driver.label;
-    this.$(".drv-blurb").textContent = driver.blurb;
+    this.$(".badge").textContent = driver.badge;
+    this.$(".rule").textContent = driver.rule;
     this.root.style.setProperty("--accent", driver.cssColor);
     this.$(".hackbox").style.display = driver.hasBonus ? "" : "none";
     this.$(".score-shaped").style.display = driver.human ? "none" : "";
-    for (const b of this.beacons) b.material.color.set(b.position.y > helipad.y + 1 ? 0x40ffb0 : 0xff5a3c);
+    for (const b of this.beacons) b.material.color.set(b.position.y > helipad.y + 1 ? 0xffffff : 0xfc3d21);
     this.drawChart();
     this.updateHud(true);
   }
@@ -165,7 +168,7 @@ export class Panel {
       for (let k = 0; k < 2; k++) {
         const sp = 3 + Math.random() * 2;
         this.particles.emit(nx, ny, 0, sa * sp + (Math.random() - 0.5) * 1.2, -ca * sp, (Math.random() - 0.5) * 0.8,
-          0.45 + Math.random() * 0.3, 0.55 + Math.random() * 0.35, [1, 0.55 + Math.random() * 0.3, 0.12], 2.2);
+          0.45 + Math.random() * 0.3, 0.55 + Math.random() * 0.35, [1, 0.8 + Math.random() * 0.15, 0.55 + Math.random() * 0.2], 2.2);
       }
       if (alt < 3.2) {
         for (let k = 0; k < 3; k++) {
@@ -177,7 +180,7 @@ export class Panel {
     }
     if (env.flame.left || env.flame.right) {
       const dir = env.flame.left ? -1 : 1;
-      this.particles.emit(l.x + dir * 0.75 * ca, l.y + 0.2, 0, dir * (2 + Math.random()), (Math.random() - 0.5) * 0.6, 0, 0.25, 0.3, [1, 0.7, 0.3], 3);
+      this.particles.emit(l.x + dir * 0.75 * ca, l.y + 0.2, 0, dir * (2 + Math.random()), (Math.random() - 0.5) * 0.6, 0, 0.25, 0.3, [1, 0.9, 0.7], 3);
     }
     if (result.outcome) this.finish(result.outcome);
   }
@@ -191,19 +194,19 @@ export class Panel {
         const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 6;
         this.particles.emit(l.x, l.y, 0, Math.cos(a) * s, Math.sin(a) * s + 2, (Math.random() - 0.5) * 4,
           0.7 + Math.random() * 1.1, 0.9 + Math.random() * 0.9,
-          Math.random() < 0.6 ? [1, 0.45 + Math.random() * 0.4, 0.1] : [0.5, 0.5, 0.55], 1.1);
+          Math.random() < 0.6 ? [1, 0.75 + Math.random() * 0.2, 0.45] : [0.55, 0.55, 0.6], 1.1);
       }
       this.camState.shake = 1;
       this.lander.tint(0x2a2a2e);
-      this.statusEl.textContent = `CRASHED  ${raw.toFixed(0)}`;
+      this.statusEl.textContent = `Crashed ${raw.toFixed(0)}`;
     } else if (outcome === "landed") {
       for (let k = 0; k < 30; k++) {
         this.particles.emit(l.x, this.heightAt(l.x) + 0.1, (Math.random() - 0.5), (Math.random() < 0.5 ? -1 : 1) * (1 + Math.random() * 2), 0.5 + Math.random(), (Math.random() - 0.5) * 2,
-          1 + Math.random(), 0.8, [0.3, 0.9, 0.6], 1.5);
+          1 + Math.random(), 0.8, [0.75, 0.82, 0.95], 1.5);
       }
-      this.statusEl.textContent = `LANDED  +${raw.toFixed(0)}`;
+      this.statusEl.textContent = `Landed +${raw.toFixed(0)}`;
     } else {
-      this.statusEl.textContent = `TIMED OUT  ${raw.toFixed(0)}  - never landed`;
+      this.statusEl.textContent = `Timed out ${raw.toFixed(0)} - never landed`;
     }
     this.statusEl.className = `status show ${outcome}`;
     this.updateHud(true);

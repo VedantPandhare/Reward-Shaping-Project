@@ -32,7 +32,9 @@ export class LunarLanderEnv {
    * @param {object} o  variant: reward variant name; windPower/turbulencePower: 0 = off;
    *                    gravity: default -10
    */
-  constructor({ variant = "baseline", windPower = 0, turbulencePower = 0, gravity = -10 } = {}) {
+  constructor({ variant = "baseline", windPower = 0, turbulencePower = 0, gravity = -10, assist = 0, walls = false } = {}) {
+    this.walls = walls; // human-only handicap: bouncy invisible side walls (agents never use them)
+    this.assist = assist; // 0 = off; else per-frame angular-velocity retention (e.g. 0.9) when no side engine fires
     this.variant = variant;
     this.windPower = windPower;
     this.turbulencePower = turbulencePower;
@@ -74,6 +76,13 @@ export class LunarLanderEnv {
         { density: 0, friction: 0.1 });
     }
 
+    if (this.walls) {
+      this.wallBody = this.world.createBody({ type: "static" });
+      for (const x of [0.05, W - 0.05]) {
+        this.wallBody.createFixture(planck.Edge(Vec2(x, 0), Vec2(x, H * 3)), { restitution: 0.6, friction: 0 });
+      }
+    }
+
     const initialX = VIEWPORT_W / SCALE / 2;
     const initialY = VIEWPORT_H / SCALE;
     this.lander = this.world.createDynamicBody({ position: Vec2(initialX, initialY), angle: 0 });
@@ -109,7 +118,8 @@ export class LunarLanderEnv {
     this.world.on("begin-contact", (c) => {
       const a = c.getFixtureA().getBody();
       const b = c.getFixtureB().getBody();
-      if (a === this.lander || b === this.lander) this.gameOver = true;
+      const wall = a === this.wallBody || b === this.wallBody;
+      if (!wall && (a === this.lander || b === this.lander)) this.gameOver = true;
       for (const leg of this.legs) if (a === leg || b === leg) this.legContact[leg.legIndex] = true;
     });
     this.world.on("end-contact", (c) => {
@@ -166,6 +176,10 @@ export class LunarLanderEnv {
       if (direction < 0) this.flame.left = true; else this.flame.right = true;
     }
 
+    if (this.assist && action !== 1 && action !== 3 && !(this.legContact[0] || this.legContact[1])) {
+      const w = lander.getAngularVelocity();
+      if (Math.abs(w) > 0.02) lander.setAngularVelocity(w * this.assist); // never touch a resting body: it must be able to sleep
+    }
     this.world.step(1 / FPS, 6 * 30, 2 * 30);
 
     const p = lander.getPosition();

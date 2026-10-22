@@ -1,22 +1,47 @@
 // JS mirror of rewardlab.wrappers: per-variant extra reward + breakdown of the built-in reward.
 
+// Plain-English descriptions: `rule` says what the agent was paid for during training.
 export const VARIANTS = {
-  baseline: { label: "Baseline", blurb: "Built-in reward only.", hack: false },
-  time_penalty: { label: "Time penalty", blurb: "-0.05 every frame.", hack: false },
+  baseline: {
+    label: "Standard agent", short: "Standard agent (built-in reward)", hack: false, badge: "Reference",
+    blurb: "Trained on the game's own reward.",
+    rule: "Paid only by the game's built-in reward: points for getting closer, slower and more upright, a small fuel cost, +100 for landing and -100 for crashing.",
+  },
+  time_penalty: {
+    label: "Hurry agent", short: "Hurry agent (time cost)", hack: false, badge: "Variant",
+    blurb: "Built-in reward plus a cost for every frame.",
+    rule: "Built-in reward, plus -0.05 points every frame, so wasting time costs points.",
+  },
   hover_hack: {
-    label: "Hover hack", hack: true,
-    blurb: "+1 per frame while upright and slow. Hovering out-earns landing.",
+    label: "Hover-hack agent", short: "Hover-hack agent (rewarded for hovering)", hack: true, badge: "Exploits its reward",
+    blurb: "Paid +1 per frame for hovering.",
+    rule: "Built-in reward, plus +1 point every frame it is upright and slow. Landing ends the game and stops those points, so it learned to hover until time runs out.",
   },
   delta_fix: {
-    label: "Delta fix", hack: false,
-    blurb: "Pays for improvement (potential shaping) + small time cost. No loophole.",
+    label: "Improvement-reward agent", short: "Improvement-reward agent (the fix)", hack: false, badge: "The fix",
+    blurb: "Paid only for getting better.",
+    rule: "Built-in reward, plus a bonus only when it gets steadier than the frame before (the change in an upright-and-slow score), and -0.05 per frame. Hovering earns nothing, so landing wins.",
   },
-  delta_no_time: { label: "Delta, no time penalty", blurb: "Improvement-based only.", hack: false },
+  delta_no_time: {
+    label: "Improvement-only agent", short: "Improvement-only agent (no time cost)", hack: false, badge: "Variant",
+    blurb: "Improvement bonus without the time cost.",
+    rule: "Same improvement bonus as the fix, but no per-frame cost. Tests whether the time cost was needed (it was not).",
+  },
   tilt_only_hack: {
-    label: "Tilt-only hack", hack: true, blurb: "+1 per frame for low tilt. Same exploit.",
+    label: "Stay-level-hack agent", short: "Stay-level-hack agent (second exploit)", hack: true, badge: "Exploits its reward",
+    blurb: "Paid +1 per frame for staying level.",
+    rule: "Built-in reward, plus +1 point every frame it is level, ignoring where it is or how fast it moves. Another loophole: stay level, never land.",
   },
-  fuel_efficient: { label: "Fuel efficient", blurb: "Doubled fuel cost.", hack: false },
-  soft_landing: { label: "Soft landing", blurb: "Penalty on touchdown speed and tilt.", hack: false },
+  fuel_efficient: {
+    label: "Fuel-saver agent", short: "Fuel-saver agent (fuel costs double)", hack: false, badge: "Trade-off",
+    blurb: "Fuel costs twice as much.",
+    rule: "Built-in reward, but every engine burn costs double. A trade-off, not a hack: it burns less fuel and lands less reliably. Trained for half as long (500k steps).",
+  },
+  soft_landing: {
+    label: "Gentle-landing agent", short: "Gentle-landing agent (touchdown penalty)", hack: false, badge: "Trade-off",
+    blurb: "Penalised for hard or tilted touchdowns.",
+    rule: "Built-in reward, plus a penalty for touchdown speed and tilt. A trade-off, not a hack. Trained for half as long (500k steps).",
+  },
 };
 
 const speed = (o) => Math.hypot(o[2], o[3]);
