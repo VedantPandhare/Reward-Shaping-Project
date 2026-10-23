@@ -15,4 +15,4 @@ PPO policies exported as JSON. Fly the lander yourself against an agent, or watc
 agent (trained with a naive per-frame bonus) next to the **delta-fix** agent on the same terrain.
 
 Run locally: `python -m http.server -d web 8000` then open http://localhost:8000.
-Source and training code: the `lunar-reward-lab` repository.
+Live: https://huggingface.co/spaces/Vedant117/Reward-Shaping-project

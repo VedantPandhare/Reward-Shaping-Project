@@ -7,3 +7,4 @@ runs/
 logs/
 web/node_modules/
 web/tests/shots/
+dist/

@@ -1,5 +1,7 @@
 # Lunar Lander Reward Shaping & Reward Hacking Lab
 
+**Live demo:** [https://huggingface.co/spaces/Vedant117/Reward-Shaping-project](https://huggingface.co/spaces/Vedant117/Reward-Shaping-project) (direct full-window link: https://vedant117-reward-shaping-project.hf.space)
+
 A naive per-frame shaping bonus taught a PPO agent to **hover until timeout instead of landing**
 (299 of 300 evaluation episodes timed out, 1 landed). An improvement-based (potential) reward fixed it:
 **99% landing, under 1% timeouts**, across 3 seeds. A numeric detector flags the hacked runs and none of the
@@ -149,4 +151,4 @@ wind (calm / breeze / storm) can be switched on.
 
 `web/` is a ready static Space (`web/README.md` has the Space metadata, `sdk: static`). Create a new
 Static Space and push the contents of `web/` (without `node_modules`, `tests/shots`). The files are
-about 5 MB. **Not deployed yet**: no live link exists.
+about 5 MB. Deployed at the link above.
