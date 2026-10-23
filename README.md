@@ -1,4 +1,4 @@
-# Lunar Lander Reward Shaping & Reward Hacking Lab
+# Lunar Lander Reward Shaping & Reward Hacking trained with PPO Algorithm
 
 [![Live demo](https://img.shields.io/badge/live%20demo-Hugging%20Face%20Space-0b3d91)](https://huggingface.co/spaces/Vedant117/Reward-Shaping-project)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
